@@ -40,16 +40,19 @@ class WindowManager {
   ~WindowManager();
 
   // The entry point to this class. Enters the main event loop.
-  void Run();
+  void Run(); //ANCHOR - 主事件循环入口
 
  private:
   // Invoked internally by Create().
   WindowManager(Display* display);
+  //SECTION - 为窗口添加边框装饰
   // Frames a top-level window.
   void Frame(Window w, bool was_created_before_window_manager);
   // Unframes a client window.
   void Unframe(Window w);
+  //?SECTION
 
+  //SECTION - 提供给X11的接口回调函数
   // Event handlers.
   void OnCreateNotify(const XCreateWindowEvent& e);
   void OnDestroyNotify(const XDestroyWindowEvent& e);
@@ -79,25 +82,29 @@ class WindowManager {
   // A mutex for protecting wm_detected_. It's not strictly speaking needed as
   // this program is single threaded, but better safe than sorry.
   static ::std::mutex wm_detected_mutex_;
+  //?SECTION
 
+  //SECTION - X底层数据结构
   // Handle to the underlying Xlib Display struct.
   Display* display_;
   // Handle to root window.
   const Window root_;
   // Maps top-level windows to their frame windows.
+  // 用于快速检索窗口和该窗口对应的frame窗口的哈希表<窗口, 对应的frame窗口>
   ::std::unordered_map<Window, Window> clients_;
 
   // The cursor position at the start of a window move/resize.
   Position<int> drag_start_pos_;
-  // The position of the affected window at the start of a window
-  // move/resize.
+  // The position of the affected window at the start of a window move/resize.
   Position<int> drag_start_frame_pos_;
   // The size of the affected window at the start of a window move/resize.
   Size<int> drag_start_frame_size_;
 
+  //NOTE - X的属性property的atom标识，是允许用户自定义的
   // Atom constants.
   const Atom WM_PROTOCOLS;
   const Atom WM_DELETE_WINDOW;
+  //?SECTION
 };
 
 #endif

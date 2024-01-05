@@ -27,6 +27,7 @@ using ::std::pair;
 using ::std::ostringstream;
 
 string ToString(const XEvent& e) {
+  //X的事件类型中，0和1号事件是预留的
   static const char* const X_EVENT_TYPE_NAMES[] = {
       "",
       "",
@@ -66,14 +67,15 @@ string ToString(const XEvent& e) {
       "GeneralEvent",
   };
 
+  //处理未知事件
   if (e.type < 2 || e.type >= LASTEvent) {
     ostringstream out;
-    out << "Unknown (" << e.type << ")";
+    out << "Unknown (" << e.type << ")"; // 由于属于未知事件，因此没有事件名称，仅打印错误码
     return out.str();
   }
 
-  // 1. Compile properties we care about.
-  vector<pair<string, string>> properties;
+  // 1. Compile properties we care about.【从事件中提取出可阅读的属性值】
+  vector<pair<string, string>> properties; // <属性字段名,属性字段值>
   switch (e.type) {
     case CreateNotify:
       properties.emplace_back(

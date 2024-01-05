@@ -56,6 +56,7 @@ struct Position {
   ::std::string ToString() const;
 };
 
+//REVIEW - vector是用来干嘛的?用于表示位移吗
 // Represents a 2D vector.
 template <typename T>
 struct Vector2D {
@@ -72,6 +73,8 @@ struct Vector2D {
 // Outputs a Size<T> as a string to a std::ostream.
 template <typename T>
 ::std::ostream& operator << (::std::ostream& out, const Position<T>& pos);
+
+//REVIEW - 这几个运算分别在什么场景下用，要看一下
 
 // Position operators.
 template <typename T>
@@ -96,12 +99,14 @@ Size<T> operator - (const Size<T>& a, const Vector2D<T> &v);
 // Joins a container of elements into a single string, with elements separated
 // by a delimiter. Any element can be used as long as an operator << on ostream
 // is defined.
+// 将一个容器合并为一个字符串，容器内元素之间用给定的delimiter分隔
 template <typename Container>
 ::std::string Join(const Container& container, const ::std::string& delimiter);
 
 // Joins a container of elements into a single string, with elements separated
 // by a delimiter. The elements are converted to string using a converter
 // function.
+// 将一个容器合并为一个字符串，容器内元素使用Converter函数转为字符串，并用给定的delimiter分隔
 template <typename Container, typename Converter>
 ::std::string Join(
     const Container& container,
@@ -110,21 +115,24 @@ template <typename Container, typename Converter>
 
 // Returns a string representation of a built-in type that we already have
 // ostream support for.
+// 将内置类型转为字符串
 template <typename T>
 ::std::string ToString(const T& x);
 
 // Returns a string describing an X event for debugging purposes.
-extern ::std::string ToString(const XEvent& e);
+// 将XEvent转化为字符串
+extern ::std::string ToString(const XEvent& e); //REVIEW - 这些extern应该不需要吧？函数不是默认extern的吗
 
 // Returns a string describing an X window configuration value mask.
+// 返回描述X窗口配置值掩码的字符串（解析出使用了哪些窗口配置）
 extern ::std::string XConfigureWindowValueMaskToString(unsigned long value_mask);
 
 // Returns the name of an X request code.
+// 返回X请求码的字符串
 extern ::std::string XRequestCodeToString(unsigned char request_code);
 
-
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- *                               IMPLEMENTATION                              *
+ *                 模板函数的实现，所以要和模板函数定义在同一个文件                  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 #include <algorithm>
 #include <vector>

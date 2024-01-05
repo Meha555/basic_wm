@@ -1,3 +1,5 @@
+.vscode/
+
 .*.swp
 *.o
 .sconsign.dblite
