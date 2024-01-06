@@ -56,7 +56,7 @@ struct Position {
   ::std::string ToString() const;
 };
 
-//REVIEW - vector是用来干嘛的?用于表示位移吗
+//NOTE - 用于表示位移（起始坐标是原点）
 // Represents a 2D vector.
 template <typename T>
 struct Vector2D {
@@ -74,19 +74,17 @@ struct Vector2D {
 template <typename T>
 ::std::ostream& operator << (::std::ostream& out, const Position<T>& pos);
 
-//REVIEW - 这几个运算分别在什么场景下用，要看一下
-
 // Position operators.
-template <typename T>
+template <typename T> // 坐标a - 坐标b = 向量v
 Vector2D<T> operator - (const Position<T>& a, const Position<T>& b);
-template <typename T>
+template <typename T> // 坐标a + 向量v = 坐标b（b - a = v的移项）
 Position<T> operator + (const Position<T>& a, const Vector2D<T> &v);
-template <typename T>
+template <typename T> // 向量v - 坐标a = 坐标b（a + b = v的移项）
 Position<T> operator + (const Vector2D<T> &v, const Position<T>& a);
-template <typename T>
+template <typename T> // 坐标a - 向量v = 坐标b（a - b = v的移项）
 Position<T> operator - (const Position<T>& a, const Vector2D<T> &v);
 
-// Size operators.
+// Size operators. 运算同上
 template <typename T>
 Vector2D<T> operator - (const Size<T>& a, const Size<T>& b);
 template <typename T>
@@ -132,7 +130,7 @@ extern ::std::string XConfigureWindowValueMaskToString(unsigned long value_mask)
 extern ::std::string XRequestCodeToString(unsigned char request_code);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- *                 模板函数的实现，所以要和模板函数定义在同一个文件                  *
+ *                 模板函数的实现，所以要和模板函数声明在同一个文件                  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 #include <algorithm>
 #include <vector>

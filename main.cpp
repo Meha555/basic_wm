@@ -25,7 +25,7 @@ using ::std::unique_ptr;
 int main(int argc, char** argv) {
   ::google::InitGoogleLogging(argv[0]);
 
-  unique_ptr<WindowManager> window_manager = WindowManager::Create();
+  unique_ptr<WindowManager> window_manager = WindowManager::Create(); // CLI参数留空，使用DISPLAY环境变量
   if (!window_manager) {
     LOG(ERROR) << "Failed to initialize window manager.";
     return EXIT_FAILURE;

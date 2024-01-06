@@ -36,14 +36,15 @@ class WindowManager {
   // failure, returns nullptr.
    static ::std::unique_ptr<WindowManager> Create(
       const std::string& display_str = std::string());
-
+  //销毁时关闭X连接
   ~WindowManager();
 
   // The entry point to this class. Enters the main event loop.
-  void Run(); //ANCHOR - 主事件循环入口
+  void Run();
 
  private:
   // Invoked internally by Create().
+  // 创建时建立X连接
   WindowManager(Display* display);
   //SECTION - 为窗口添加边框装饰
   // Frames a top-level window.
@@ -54,22 +55,25 @@ class WindowManager {
 
   //SECTION - 提供给X11的接口回调函数
   // Event handlers.
+  //大部分的Notify回调都没有什么要做的，因为此时WM只能响应，不能拦截
   void OnCreateNotify(const XCreateWindowEvent& e);
   void OnDestroyNotify(const XDestroyWindowEvent& e);
   void OnReparentNotify(const XReparentEvent& e);
   void OnMapNotify(const XMapEvent& e);
   void OnUnmapNotify(const XUnmapEvent& e);
   void OnConfigureNotify(const XConfigureEvent& e);
+  void OnMotionNotify(const XMotionEvent& e);
+
+  //而Request回调就有事情做了
   void OnMapRequest(const XMapRequestEvent& e);
   void OnConfigureRequest(const XConfigureRequestEvent& e);
   void OnButtonPress(const XButtonEvent& e);
   void OnButtonRelease(const XButtonEvent& e);
-  void OnMotionNotify(const XMotionEvent& e);
   void OnKeyPress(const XKeyEvent& e);
   void OnKeyRelease(const XKeyEvent& e);
 
   // Xlib error handler. It must be static as its address is passed to Xlib.
-  static int OnXError(Display* display, XErrorEvent* e);
+  static int OnXError(Display* display, XErrorEvent* e); // 仅用于打印错误信息
   // Xlib error handler used to determine whether another window manager is
   // running. It is set as the error handler right before selecting substructure
   // redirection mask on the root window, so it is invoked if and only if

@@ -33,9 +33,9 @@ using ::std::unique_ptr;
 bool WindowManager::wm_detected_;
 mutex WindowManager::wm_detected_mutex_;
 
-/// @brief 
+/// @brief 创建连接到X服务器的WM对象的静态工厂方法
 /// @param display_str 是创建窗口的CLI参数，决定WM的实例特性
-/// @return 函数返回的是临时unique_ptr，因此是亡值，调用移动构造函数（因此成立，unique_ptr没有拷贝构造）
+/// @return 函数返回的是临时unique_ptr，因此是亡值，会调用移动构造函数（因此成立，unique_ptr没有拷贝构造）
 unique_ptr<WindowManager> WindowManager::Create(const string& display_str) {
   // 1. Open X display.
   const char* display_c_str =
@@ -75,7 +75,7 @@ void WindowManager::Run() {
         display_,
         root_,
         SubstructureRedirectMask | SubstructureNotifyMask); //NOTE - 窗口管理器要能响应子结构重定向事件（手册上只有这两个与子结构重定向的事件掩码）
-    XSync(display_, false); //REVIEW - 不会丢弃在事件队列中的事件
+    XSync(display_, false); //false表示不丢弃请求队列中的现有事件
     if (wm_detected_) {
       LOG(ERROR) << "Detected another window manager on display "
                  << XDisplayString(display_);
@@ -85,6 +85,7 @@ void WindowManager::Run() {
   //   b. Set error handler.
   XSetErrorHandler(&WindowManager::OnXError);
   //   c. Grab X server to prevent windows from changing under us.
+  //SECTION - 使用了Grab操作来锁定Xserver，因为接下来要获取所有的窗口，此时不能让Xserver继续创建或销毁窗口
   XGrabServer(display_);
   //   d. Reparent existing top-level windows.
   //     i. Query existing top-level windows.
@@ -92,7 +93,7 @@ void WindowManager::Run() {
   Window* top_level_windows;
   unsigned int num_top_level_windows;
   //由于是查询根窗口的所有子窗口，因此就能得到当前所有的子窗口
-  //从而对所有子窗口进行repaint/frame
+  //从而对所有子窗口进行reparent/frame
   CHECK(XQueryTree(
       display_,
       root_,
@@ -101,28 +102,28 @@ void WindowManager::Run() {
       &top_level_windows, //子窗口ID数组
       &num_top_level_windows));//子窗口的数量
   CHECK_EQ(returned_root, root_);
-  //     ii. Frame each top-level window.
+  //     ii. Frame each existing top-level window.
   for (unsigned int i = 0; i < num_top_level_windows; ++i) {
-    //显然，在Run()调用时，当前存在的所有窗口都是在WM创建前创建的
+    //显然，在Run()调用时，当前存在的所有窗口都是在WM创建前创建的，因此第二个参数为true
     Frame(top_level_windows[i], true);
   }
 
-  //REVIEW - 为什么要释放在WM启动之前的所有窗口？？
-  //     iii. Free top-level window array.
+  //     iii. Free top-level window array. 因为后面不再需要这个数组了，XQueryTree()要求我们使用XFree()释放内存
   XFree(top_level_windows);
   //   e. Ungrab X server.
   XUngrabServer(display_);
+  //?SECTION - 使用了UnGrab操作来解锁Xserver
 
   // 2. Main event loop.
   for (;;) {
     // 1. Get next event.
     XEvent e;
-    XNextEvent(display_, &e);
+    XNextEvent(display_, &e); //隐含着刷新事件队列
     LOG(INFO) << "Received event: " << ToString(e);
 
     // 2. Dispatch event.
     switch (e.type) {
-      case CreateNotify:
+      case CreateNotify: //某个Xclient创建了窗口，仅Create还没有Map，因此不可见，因此WM不用执行任何操作（虽然不可见的窗口也由WM管理）
         OnCreateNotify(e.xcreatewindow);
         break;
       case DestroyNotify:
@@ -135,17 +136,17 @@ void WindowManager::Run() {
         OnMapNotify(e.xmap);
         break;
       case UnmapNotify:
-        OnUnmapNotify(e.xunmap);
+        OnUnmapNotify(e.xunmap);//unmap事件出现在Xclient退出或最小化的时刻
         break;
       case ConfigureNotify:
         OnConfigureNotify(e.xconfigure);
         break;
       case MapRequest:
-        OnMapRequest(e.xmaprequest);
+        OnMapRequest(e.xmaprequest); //显示窗口
         break;
       case ConfigureRequest:
-        OnConfigureRequest(e.xconfigurerequest);
-        break;
+          OnConfigureRequest(e.xconfigurerequest); //原模原样地为接受Xclient的调整窗口属性的请求，啥也没过滤
+          break;
       case ButtonPress:
         OnButtonPress(e.xbutton);
         break;
@@ -176,6 +177,8 @@ void WindowManager::Frame(Window w, bool was_created_before_window_manager) {
   const unsigned long BORDER_COLOR = 0xff0000;
   const unsigned long BG_COLOR = 0x0000ff;
 
+  //以下使用w表示要被frame的窗口
+
   // We shouldn't be framing windows we've already framed.
   CHECK(!clients_.count(w)); //避免重复frame
 
@@ -187,15 +190,16 @@ void WindowManager::Frame(Window w, bool was_created_before_window_manager) {
   // 2. If window was created before window manager started, we should frame
   // it only if it is visible and doesn't set override_redirect.
   // 2. 如果窗口是在窗口管理器启动之前创建的，
-  // 我们应该只在它 可见 且 没有设置override_redirect的情况下才对它进行frame。
+  // 我们应该只在它 可见(被Map了) 且 没有设置override_redirect 的情况下才对它进行frame
+  // 前者加frame没有意义，后者不受WM管理
   if (was_created_before_window_manager) {
     if (x_window_attrs.override_redirect ||
-        x_window_attrs.map_state != IsViewable) {
+        x_window_attrs.map_state != IsViewable) { //map_state指示窗口是否可见
       return;
     }
   }
 
-  // 3. Create frame.
+  // 3. Create frame. 创建frame窗口同样也会触发CreateNotify事件，但同理，由于是Notify，其实WM没有什么要做的（即OnCreateNotify函数为空）
   const Window frame = XCreateSimpleWindow(
       display_,
       root_,
@@ -207,26 +211,30 @@ void WindowManager::Frame(Window w, bool was_created_before_window_manager) {
       BORDER_COLOR,
       BG_COLOR);
   // 4. Select events on frame.
+  // 由于子结构重定向仅适用于直接子窗口，因此在w窗口成为frame窗口的子窗口后，w窗口在WM上注册的子结构重定向失效了，
+  // 因此需要将frame窗口在XSelectInput函数调用者(这里即WM)上注册子结构重定向
   XSelectInput(
       display_,
       frame,
       SubstructureRedirectMask | SubstructureNotifyMask);
-  // 5. Add client to save set, so that it will be restored and kept alive if we
-  // crash.
-  XAddToSaveSet(display_, w); //REVIEW - save set是什么？
+  // 5. Add client to save set, so that it will be restored and kept alive if we crash.
+  XAddToSaveSet(display_, w);
   // 6. Reparent client window.
+  // 使得w成为frame的子窗口
   XReparentWindow(
       display_,
       w,
       frame,
       0, 0);  // Offset of client window within frame.
   // 7. Map frame.
-  XMapWindow(display_, frame); //REVIEW - 什么是Map操作和Unmap操作？
+  // 显示(Map)窗口的frame
+  XMapWindow(display_, frame);
   // 8. Save frame handle.
   clients_[w] = frame; //存入哈希表
   // 9. Grab universal window management actions on client window.
+  // 在w上注册键盘和鼠标事件
   //   a. Move windows with alt + left button.
-  //REVIEW - 什么是Grab操作？
+  //NOTE - Grab具体的
   XGrabButton(
       display_,
       Button1,
@@ -281,6 +289,7 @@ void WindowManager::Unframe(Window w) {
   // 1. Unmap frame.
   XUnmapWindow(display_, frame);
   // 2. Reparent client window.
+  // 重新将w窗口设置为root window的直接子窗口
   XReparentWindow(
       display_,
       w,
@@ -308,7 +317,9 @@ void WindowManager::OnUnmapNotify(const XUnmapEvent& e) {
   // If the window is a client window we manage, unframe it upon UnmapNotify.
   // We need the check because we will receive an UnmapNotify event for a
   // frame window we just destroyed ourselves.
-  // 如果窗口是我们管理的客户端窗口，在UnmapNotify这个函数中进行unframe
+  // 因为我们在Unframe()函数中调用了XUnmapWindow()来unmap Xclient的frame窗口，
+  // 因此会触发OnUNmapNotify()，于是出现了递归调用。如果我们为frame窗口进行Unmap就会出现错误，
+  // 因为它刚刚已经被我们unmap了。同理如果窗口是我们管理的客户端窗口，那么才进行unframe
   if (!clients_.count(e.window)) {
       LOG(INFO) << "Ignore UnmapNotify for non-client window " << e.window;
     return;
@@ -323,11 +334,10 @@ void WindowManager::OnUnmapNotify(const XUnmapEvent& e) {
   // should have this attribute set to a frame window we maintain. Only an
   // UnmapNotify event triggered by reparenting a pre-existing window will have
   // this attribute set to the root window.
-  //REVIEW - 没懂
   /*
   因为我们从SubstructureNotify掩码接收UnmapNotify事件，所以event属性指定了unmap的窗口的父窗口。
   这意味着来自普通客户端窗口的UnmapNotify事件应该将此属性设置到我们维护的frame窗口上。
-  只有当repaint一个已经存在的窗口时触发的UnmapNotify事件才会将这个属性设置到根窗口上。
+  只有当为一个已经存在的窗口重设父窗口时触发的UnmapNotify事件才会将这个属性设置到根窗口上。
   */
   if (e.event == root_) {
     LOG(INFO) << "Ignore UnmapNotify for reparented pre-existing window "
@@ -342,6 +352,7 @@ void WindowManager::OnConfigureNotify(const XConfigureEvent& e) {}
 
 void WindowManager::OnMapRequest(const XMapRequestEvent& e) {
   // 1. Frame or re-frame window.
+  // 显然此时WM已经运行起来了，所以第二个参数为false
   Frame(e.window, false);
   // 2. Actually map window.
   XMapWindow(display_, e.window);
@@ -372,6 +383,7 @@ void WindowManager::OnButtonPress(const XButtonEvent& e) {
   const Window frame = clients_[e.window];
 
   // 1. Save initial cursor position.
+  // 这里获取按键按下时窗口的初始位置
   drag_start_pos_ = Position<int>(e.x_root, e.y_root);
 
   // 2. Save initial window info.
@@ -394,15 +406,19 @@ void WindowManager::OnButtonPress(const XButtonEvent& e) {
 }
 
 void WindowManager::OnButtonRelease(const XButtonEvent& e) {}
-//REVIEW - 暂时没研究怎么实现变换的
+//REVIEW - 没搞懂怎么完成移动和缩放的
 void WindowManager::OnMotionNotify(const XMotionEvent& e) {
-  //检查并获取frame窗口
+  //检查并获取frame窗口，因为frame窗口也要跟着一起变换
   CHECK(clients_.count(e.window));
   const Window frame = clients_[e.window];
-  
+  //得到拖拽的终点和位移
   const Position<int> drag_pos(e.x_root, e.y_root);
   const Vector2D<int> delta = drag_pos - drag_start_pos_;
-
+  /*
+  - Button1Mask：鼠标左键
+  - Button2Mask：鼠标中键
+  - Button3Mask：鼠标右键
+  */
   if (e.state & Button1Mask ) {
     // alt + left button: Move window.
     const Position<int> dest_frame_pos = drag_start_frame_pos_ + delta;
@@ -431,6 +447,7 @@ void WindowManager::OnMotionNotify(const XMotionEvent& e) {
 }
 
 void WindowManager::OnKeyPress(const XKeyEvent& e) {
+  //Mod1Mask是左Alt键
   if ((e.state & Mod1Mask) &&
       (e.keycode == XKeysymToKeycode(display_, XK_F4))) {
     // alt + f4: Close window.
@@ -505,6 +522,7 @@ int WindowManager::OnWMDetected(Display* display, XErrorEvent* e) {
   // In the case of an already running window manager, the error code from
   // XSelectInput is BadAccess. We don't expect this handler to receive any
   // other errors.
+  // 此时WM已经启动，因此多次启动WM返回的错误码应当是BadAccess
   CHECK_EQ(static_cast<int>(e->error_code), BadAccess);
   // Set flag.
   wm_detected_ = true;
