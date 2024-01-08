@@ -22,7 +22,14 @@
 
 using ::std::unique_ptr;
 
+inline void errorStackPrinter(const char *str, int size) {
+    LOG(ERROR) << ::std::string(str, size);
+}
+
 int main(int argc, char** argv) {
+  FLAGS_colorlogtostderr = true;
+  ::google::InstallFailureSignalHandler(); // 配置安装程序崩溃失败信号处理器
+  ::google::InstallFailureWriter(errorStackPrinter); // 安装配置程序失败信号的信息打印过程，设置回调函数
   ::google::InitGoogleLogging(argv[0]);
 
   unique_ptr<WindowManager> window_manager = WindowManager::Create(); // CLI参数留空，使用DISPLAY环境变量

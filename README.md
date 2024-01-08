@@ -59,6 +59,8 @@ This will launch a simple Xephyr session like in the following screenshot:
 Usage
 -----
 
+需要先按 **Ctrl+Shift** 让X client捕获光标。
+
 Supported keyboard shortcuts:
 
 * **Alt + Left Click**: Move window

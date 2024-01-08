@@ -94,7 +94,7 @@ class WindowManager {
   // Handle to root window.
   const Window root_;
   // Maps top-level windows to their frame windows.
-  // 用于快速检索窗口和该窗口对应的frame窗口的哈希表<窗口, 对应的frame窗口>
+  // 存储受WM管理的所有窗口，还可用于快速检索窗口和该窗口对应的frame窗口的哈希表<窗口, 对应的frame窗口>
   ::std::unordered_map<Window, Window> clients_;
 
   // The cursor position at the start of a window move/resize.
@@ -104,10 +104,10 @@ class WindowManager {
   // The size of the affected window at the start of a window move/resize.
   Size<int> drag_start_frame_size_;
 
-  //NOTE - X的属性property的atom标识，是允许用户自定义的
+  //NOTE - X的属性property的atom标识，是允许用户自定义的（这里使用的预定义的属性）
   // Atom constants.
-  const Atom WM_PROTOCOLS;
-  const Atom WM_DELETE_WINDOW;
+  const Atom WM_PROTOCOLS; // 是X server与X client采用的通信协议对应的atom标识
+  const Atom WM_DELETE_WINDOW; // 请求删除顶级窗口，这个就是WM_PROTOCOLS中规定的协议之一
   //?SECTION
 };
 
