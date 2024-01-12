@@ -26,6 +26,7 @@ extern "C" {
 #include <mutex>
 #include <string>
 #include <unordered_map>
+
 #include "util.hpp"
 
 // Implementation of a window manager for an X screen.
@@ -34,9 +35,9 @@ class WindowManager {
   // Creates a WindowManager instance for the X display/screen specified by the
   // argument string, or if unspecified, the DISPLAY environment variable. On
   // failure, returns nullptr.
-   static ::std::unique_ptr<WindowManager> Create(
+  static ::std::unique_ptr<WindowManager> Create(
       const std::string& display_str = std::string());
-  //销毁时关闭X连接
+  // 销毁时关闭X连接
   ~WindowManager();
 
   // The entry point to this class. Enters the main event loop.
@@ -46,16 +47,16 @@ class WindowManager {
   // Invoked internally by Create().
   // 创建时建立X连接
   WindowManager(Display* display);
-  //SECTION - 为窗口添加边框装饰
-  // Frames a top-level window.
+  // SECTION - 为窗口添加边框装饰
+  //  Frames a top-level window.
   void Frame(Window w, bool was_created_before_window_manager);
   // Unframes a client window.
   void Unframe(Window w);
   //?SECTION
 
-  //SECTION - 提供给X11的接口回调函数
-  // Event handlers.
-  //大部分的Notify回调都没有什么要做的，因为此时WM只能响应，不能拦截
+  // SECTION - 提供给X11的接口回调函数
+  //  Event handlers.
+  // 大部分的Notify回调都没有什么要做的，因为此时WM只能响应，不能拦截
   void OnCreateNotify(const XCreateWindowEvent& e);
   void OnDestroyNotify(const XDestroyWindowEvent& e);
   void OnReparentNotify(const XReparentEvent& e);
@@ -64,7 +65,7 @@ class WindowManager {
   void OnConfigureNotify(const XConfigureEvent& e);
   void OnMotionNotify(const XMotionEvent& e);
 
-  //而Request回调就有事情做了
+  // 而Request回调就有事情做了
   void OnMapRequest(const XMapRequestEvent& e);
   void OnConfigureRequest(const XConfigureRequestEvent& e);
   void OnButtonPress(const XButtonEvent& e);
@@ -73,7 +74,7 @@ class WindowManager {
   void OnKeyRelease(const XKeyEvent& e);
 
   // Xlib error handler. It must be static as its address is passed to Xlib.
-  static int OnXError(Display* display, XErrorEvent* e); // 仅用于打印错误信息
+  static int OnXError(Display* display, XErrorEvent* e);  // 仅用于打印错误信息
   // Xlib error handler used to determine whether another window manager is
   // running. It is set as the error handler right before selecting substructure
   // redirection mask on the root window, so it is invoked if and only if
@@ -88,13 +89,14 @@ class WindowManager {
   static ::std::mutex wm_detected_mutex_;
   //?SECTION
 
-  //SECTION - X底层数据结构
-  // Handle to the underlying Xlib Display struct.
+  // SECTION - X底层数据结构
+  //  Handle to the underlying Xlib Display struct.
   Display* display_;
   // Handle to root window.
   const Window root_;
   // Maps top-level windows to their frame windows.
-  // 存储受WM管理的所有窗口，还可用于快速检索窗口和该窗口对应的frame窗口的哈希表<窗口, 对应的frame窗口>
+  // 存储受WM管理的所有窗口，还可用于快速检索窗口和该窗口对应的frame窗口的哈希表<窗口,
+  // 对应的frame窗口>
   ::std::unordered_map<Window, Window> clients_;
 
   // The cursor position at the start of a window move/resize.
@@ -104,10 +106,12 @@ class WindowManager {
   // The size of the affected window at the start of a window move/resize.
   Size<int> drag_start_frame_size_;
 
-  //NOTE - X的属性property的atom标识，是允许用户自定义的（这里使用的预定义的属性）
-  // Atom constants.
-  const Atom WM_PROTOCOLS; // 是X server与X client采用的通信协议对应的atom标识
-  const Atom WM_DELETE_WINDOW; // 请求删除顶级窗口，这个就是WM_PROTOCOLS中规定的协议之一
+  // NOTE -
+  // X的属性property的atom标识，是允许用户自定义的（这里使用的预定义的属性）
+  //  Atom constants.
+  const Atom WM_PROTOCOLS;  // REVIEW - 不懂
+  const Atom
+      WM_DELETE_WINDOW;  // 请求删除顶级窗口，这个是我们自己定义的属性（的名字）
   //?SECTION
 };
 
