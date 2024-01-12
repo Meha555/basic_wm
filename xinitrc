@@ -26,4 +26,4 @@ sleep 2 && xterm &
 # 2. Start our window manager.
 export GLOG_logtostderr=1
 exec ./basic_wm
-
+# valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all ./basic_wm

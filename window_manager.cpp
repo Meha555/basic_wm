@@ -58,7 +58,7 @@ WindowManager::WindowManager(Display* display)
 {}
 
 WindowManager::~WindowManager() {
-  XCloseDisplay(display_);
+  XCloseDisplay(display_); // WM并不决定X Client的声明周期，因此仅释放自己和自己的X连接
 }
 
 void WindowManager::Run() {
@@ -348,7 +348,7 @@ void WindowManager::OnUnmapNotify(const XUnmapEvent& e) {
   // UnmapNotify event triggered by reparenting a pre-existing window will have
   // this attribute set to the root window.
 
-  // NOTE - 忽略由WM启动之前map的窗口的reparent操作所出发的事件（这中情况发生在Run()，即WM刚刚创建时）
+  // NOTE - 忽略由WM启动之前map的窗口的reparent操作所触发的事件（这中情况发生在Run()，即WM刚刚创建时）
   // 只有当为WM创建之前就存在的窗口重设父窗口时触发的UnmapNotify事件才会将这个事件传播到根窗口（因为这些窗口还暂时不属于WM管理，没有被子结构重定向）。
   if (e.event == root_) {
     LOG(INFO) << "Ignore UnmapNotify for reparented pre-existing window "
@@ -357,8 +357,7 @@ void WindowManager::OnUnmapNotify(const XUnmapEvent& e) {
   }
 
   // 因为我们是通过SubstructureNotify掩码来设置接受UnmapNotify事件的，所以这里的event的成员中会包含被unmap的窗口的父窗口（因为子结构重定向）。
-  // 这意味着来自普通客户端窗口的UnmapNotify事件应该也作用于frame窗口，这样才会实现客户端和frame窗口一起最小化或关闭。
-  // 因此这里
+  // 这意味着来自普通客户端窗口的UnmapNotify事件应该也作用于frame窗口，这样才会实现客户端和frame窗口一起最小化或关闭
   Unframe(e.window);
 }
 
@@ -498,7 +497,9 @@ void WindowManager::OnKeyPress(const XKeyEvent& e) {
       msg.xclient.format = 32;
       msg.xclient.data.l[0] = WM_DELETE_WINDOW;
       // 2. Send message to window to be closed.
-      CHECK(XSendEvent(display_, e.window, false, 0, &msg)); // 关闭事件不传播
+      CHECK(XSendEvent(display_, e.window, false, NoEventMask,
+                       &msg)); // 事件不传播
+      free(supported_protocols);
     } else {
       LOG(INFO) << "Killing window " << e.window;
       XKillClient(display_, e.window);
