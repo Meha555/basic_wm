@@ -108,10 +108,10 @@ class WindowManager {
 
   // NOTE -
   // X的属性property的atom标识，是允许用户自定义的（这里使用的预定义的属性）
+  // WM_DELETE_WINDOW是WM_PROTOCOLS中的一个协议
   //  Atom constants.
-  const Atom WM_PROTOCOLS;  // REVIEW - 不懂
-  const Atom
-      WM_DELETE_WINDOW;  // 请求删除顶级窗口，这个是我们自己定义的属性（的名字）
+  const Atom WM_PROTOCOLS;  // 窗管协议族这个属性对应的原子
+  const Atom WM_DELETE_WINDOW;  // 窗管关闭窗口协议这个属性对应的原子
   //?SECTION
 };
 

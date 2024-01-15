@@ -55,8 +55,7 @@ unique_ptr<WindowManager> WindowManager::Create(const string& display_str) {
 WindowManager::WindowManager(Display* display)
     : display_(CHECK_NOTNULL(display)),
       root_(DefaultRootWindow(display_)),  // 获取顶层窗口ID
-      // REVIEW - 这里协议不是很清楚，注册属性到X server是为了其他的X
-      // client能读取这个属性吗？
+      //为当前窗管设置WM_PROTOCOLS，指定支持WM_DELETE_WINDOW协议
       WM_PROTOCOLS(
           XInternAtom(display_, "WM_PROTOCOLS",
                       false)),  // 不存在就创建，并拿到服务器返回的原子标识
@@ -179,7 +178,8 @@ void WindowManager::Run() {
         break;
       case MotionNotify:
         // Skip any already pending motion events.
-        // 取出与事件e中描述的窗口相匹配的Motion事件，跳过其他不是e所描述的窗口的Motion事件??
+        // 跳过在事件队列中尚未处理的一大堆移动事件，只处理最近的那个就行，
+        // 因为如果每个移动事件都处理的话，就会导致频繁绘图，徒增计算量，甚至导致卡顿
         while (XCheckTypedWindowEvent(display_, e.xmotion.window, MotionNotify,
                                       &e))
           ;
@@ -230,6 +230,10 @@ void WindowManager::Frame(Window w, bool was_created_before_window_manager) {
   const Window frame = XCreateSimpleWindow(
       display_, root_, x_window_attrs.x, x_window_attrs.y, x_window_attrs.width,
       x_window_attrs.height, BORDER_WIDTH, BORDER_COLOR, BG_COLOR);
+  // 设置窗口标题
+  ::std::string title("WID: ");
+  title.append(ToString(w));
+  XStoreName(display_, frame, title.c_str());
   // 4. Select events on frame.
   // 由于子结构重定向仅适用于直接子窗口，因此在w窗口成为frame窗口的子窗口后，之前在w上注册的子结构重定向失效了，
   // 因此需要在frame窗口上注册子结构重定向，这样frame窗口和w窗口上发生的事件才能被重定向到WM
@@ -439,9 +443,9 @@ void WindowManager::OnKeyPress(const XKeyEvent& e) {
     // has not explicitly marked itself as supporting this more civilized
     // behavior (using XSetWMProtocols()), we kill it with XKillClient().
     /*
-    有两种方法可以让窗口关闭：
+    有两种方法可以让窗口关闭：【关闭窗口不在X11协议内，而是在WM窗管协议内，因此要使用WM_PROTOCOLS来启用窗管协议】
     -
-    第一种是发送一个类型为WM_PROTOCOLS的request报文给要关闭的窗口，值为WM_DELETE_WINDOW，这样当Xclient接收到这个报文时，就能关闭窗口
+    第一种是设置WM_PROTOCOLS给要关闭的窗口，值为WM_DELETE_WINDOW，这样当Xclient接收到这个报文时，就能关闭窗口
     -
     否则如果客户端没有使用XSetWMProtocols()来标记自己支持这种更安全的关闭方式，就得使用XKillClient()强制关闭窗口。
     */
